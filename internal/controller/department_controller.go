@@ -1,4 +1,4 @@
-package service
+package controller
 
 import (
 	"errors"
@@ -14,6 +14,9 @@ type DepartmentController struct {
 }
 
 func (dc *DepartmentController) HandleRequest() {
+	//TODO: строка - мок
+	dc.Controller.Dependencies.DBDecorator.GormInterface.AutoMigrate(&model.Department{}, &model.Employee{})
+
 	dc.Controller.ServeMux.HandleFunc("POST /departments",
 		dc.Validate(func(w http.ResponseWriter, r *http.Request) {
 			dc.CreateDepartment(w, base.NewRequest(r))
@@ -46,7 +49,9 @@ func (dc *DepartmentController) GetDepartment(w http.ResponseWriter, r *base.Req
 	if err != nil {
 		base.NewResponse().SendError(w, err.Error(), http.StatusBadRequest)
 	}
-	d, err := model.GetDepartmentById(dc.Controller.Dependencies.DBDecorator.GormInterface, id)
+
+	//TODO: вместо хардкода использовать query параметр
+	d, err := model.GetDepartmentTree(dc.Controller.Dependencies.DBDecorator.GormInterface, id, 5)
 	if err != nil && errors.Is(err, model.DepartmentNotFoundErr) {
 		base.NewResponse().SendError(w, err.Error(), http.StatusNotFound)
 		return

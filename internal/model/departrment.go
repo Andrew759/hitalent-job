@@ -8,12 +8,12 @@ import (
 )
 
 type Department struct {
-	Id          int                             `json:"id" gorm:"type:int;unique;primaryKey;autoIncrement"`
-	Name        string                          `json:"name" gorm:"type:not null;size:200;uniqueIndex:idx_name_parent"`
-	ParentId    *int                            `json:"parentId" gorm:"type:int;uniqueIndex:idx_name_parent"`
+	Id          int                             `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name        string                          `json:"name" gorm:"not null;size:200;uniqueIndex:idx_name_parent"`
+	ParentId    *int                            `json:"parentId" gorm:"index:idx_name_parent"`
 	CreatedAt   time.TimestampWithTimeZoneMicro `json:"created_at"`
-	Departments []Department                    `json:"departments" gorm:"foreignKey:ParentId;references:Id;constraint:OnDelete:CASCADE"`
-	Employees   []Employee                      `json:"employess" gorm:"foreignKey:DepartmentId;constraint:OnDelete:CASCADE"`
+	Departments []Department                    `json:"children" gorm:"foreignKey:ParentId;constraint:OnDelete:CASCADE"`
+	Employees   []Employee                      `json:"employees" gorm:"foreignKey:DepartmentId;constraint:OnDelete:CASCADE"`
 }
 
 var DepartmentNotFoundErr = errors.New("department not found")
@@ -33,6 +33,45 @@ func GetDepartmentById(db *gorm.DB, id int) (Department, error) {
 	}
 
 	return department, result.Error
+}
+
+// GetDepartmentTree Функция, возвращающая вложенные результаты рекурсивно
+func GetDepartmentTree(db *gorm.DB, id int, maxDepth int) (Department, error) {
+	var department Department
+
+	// Прелоад и сортировка для сотрудников корневого департамента
+	err := db.Preload("Employees", func(db *gorm.DB) *gorm.DB {
+		return db.Order("created_at DESC") // DESC для новых сверху, или ASC
+	}).
+		//TODO: нужно ли прелоадить департаменты Employees?
+		// Preload("Employees.Department").
+		//По умолчанию минимальная глубина всегда будет 1
+		Preload("Departments", recursivePreload(1, maxDepth)).
+		First(&department, id).Error
+
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return Department{}, DepartmentNotFoundErr
+	}
+	return department, err
+}
+
+// Вспомогательная функци ядля рекурсии
+func recursivePreload(minDepth int, maxDepth int) func(db *gorm.DB) *gorm.DB {
+	return func(db *gorm.DB) *gorm.DB {
+		// Базовая настройка загрузки сотрудников с сортировкой
+		employeeOrder := func(db *gorm.DB) *gorm.DB {
+			return db.Order("created_at DESC")
+		}
+
+		if minDepth >= maxDepth {
+			return db.Preload("Employees", employeeOrder).
+				Preload("Employees.Department")
+		}
+
+		return db.Preload("Employees", employeeOrder).
+			Preload("Employees.Department").
+			Preload("Departments", recursivePreload(minDepth+1, maxDepth))
+	}
 }
 
 // DeleteAllSubDepartmentsByParentId TODO: избавиться от циклов и переписать всё на нативный SQL запрос?

@@ -3,8 +3,8 @@ package factory
 import (
 	"hitalent/cmd/service"
 	"hitalent/internal/base"
+	internalService "hitalent/internal/controller"
 	"hitalent/internal/middleware"
-	internalService "hitalent/internal/service"
 	"net/http"
 )
 
