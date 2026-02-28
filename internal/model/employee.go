@@ -1,6 +1,10 @@
 package model
 
-import "hitalent/pkg/gorm_tweaks/time"
+import (
+	"hitalent/pkg/gorm_tweaks/time"
+
+	"gorm.io/gorm"
+)
 
 type Employee struct {
 	Id           int `json:"id" gorm:"type:int;unique;primaryKey;autoIncrement"`
@@ -10,4 +14,12 @@ type Employee struct {
 	Position     string                          `json:"position" gorm:"type:string;not null;size:200"`
 	HiredAt      time.TimestampWithTimeZoneMicro `json:"hired_at"`
 	CreatedAt    time.TimestampWithTimeZoneMicro `json:"created_at"`
+}
+
+func ReassignEmployeeToDepById(db gorm.DB, depId int, newDepId int) error {
+	result := db.Model(&Employee{}).
+		Where("department_id = ?", depId).
+		Update("department_id", newDepId)
+
+	return result.Error
 }

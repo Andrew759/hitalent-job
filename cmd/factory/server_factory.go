@@ -38,6 +38,16 @@ func initOrganizationServer(mux *http.ServeMux, diContainer base.DIContainer) {
 			DBDecorator: diContainer.DBDecorator,
 		},
 	}
+	employeeController := internalService.EmployeeController{
+		Controller: base.Controller{
+			ServeMux:     mux,
+			Dependencies: diContainer,
+		},
+		Validator: middleware.EmployeeValidator{
+			DBDecorator: diContainer.DBDecorator,
+		},
+	}
 
 	departmentController.HandleRequest()
+	employeeController.HandleRequest()
 }
