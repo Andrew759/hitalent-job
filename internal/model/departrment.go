@@ -36,16 +36,14 @@ func GetDepartmentById(db *gorm.DB, id int) (Department, error) {
 }
 
 // GetDepartmentTree Функция, возвращающая вложенные результаты рекурсивно
-func GetDepartmentTree(db *gorm.DB, id int, maxDepth int) (Department, error) {
+func GetDepartmentTree(db *gorm.DB, id int, maxDepth int, includeEmployees bool) (Department, error) {
 	var department Department
 
-	// Прелоад и сортировка для сотрудников корневого департамента
-	err := db.Preload("Employees", func(db *gorm.DB) *gorm.DB {
-		return db.Order("created_at DESC") // DESC для новых сверху, или ASC
-	}).
-		//TODO: нужно ли прелоадить департаменты Employees?
-		// Preload("Employees.Department").
-		//По умолчанию минимальная глубина всегда будет 1
+	if includeEmployees {
+		db = db.Preload("Employees", sortedEmployees)
+	}
+
+	err := db.
 		Preload("Departments", recursivePreload(1, maxDepth)).
 		First(&department, id).Error
 
@@ -55,34 +53,34 @@ func GetDepartmentTree(db *gorm.DB, id int, maxDepth int) (Department, error) {
 	return department, err
 }
 
-// Вспомогательная функци ядля рекурсии
-func recursivePreload(minDepth int, maxDepth int) func(db *gorm.DB) *gorm.DB {
+// Вспомогательная функция для рекурсии
+func recursivePreload(currentDepth int, maxDepth int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
-		// Базовая настройка загрузки сотрудников с сортировкой
-		employeeOrder := func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at DESC")
+		//query := db.Preload("Employees", sortedEmployees)
+
+		//Если лимит не достигнут - рекурсия продолжается
+		if currentDepth < maxDepth {
+			db = db.Preload("Departments", recursivePreload(currentDepth+1, maxDepth))
 		}
 
-		if minDepth >= maxDepth {
-			return db.Preload("Employees", employeeOrder).
-				Preload("Employees.Department")
-		}
-
-		return db.Preload("Employees", employeeOrder).
-			Preload("Employees.Department").
-			Preload("Departments", recursivePreload(minDepth+1, maxDepth))
+		return db
 	}
 }
 
+// Cортировка employees по дате создания
+func sortedEmployees(db *gorm.DB) *gorm.DB {
+	return db.Order("created_at DESC")
+}
+
 // DeleteAllSubDepartmentsByParentId TODO: избавиться от циклов и переписать всё на нативный SQL запрос?
-func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, reassignToDepId *int) error {
+func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, cascade bool, reassignToDepId *int) error {
 	if reassignToDepId != nil {
 		err := ReassignEmployeeToDepById(*db, parentId, *reassignToDepId)
 		if err != nil {
 			return err
 		}
 	}
-	subDeps := GetSubDepartmentsByParentId(*db, parentId)
+	subDeps := GetSubDepartmentsByParentId(db, parentId)
 	var subDepIds []int
 	for _, sub := range subDeps {
 		subDepIds = append(subDepIds, sub.Id)
@@ -91,26 +89,30 @@ func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, reassignToDepI
 		}
 	}
 
-	for _, id := range subDepIds {
-		err := DeleteAllSubDepartmentsByParentId(db, id, reassignToDepId)
-		if err != nil {
-			return err
+	//TODO: тут вероятен баг - субдепартаменты могут удалиться по каскадному ограничению БД, либо в parentId будет
+	// не действительный результат
+	if cascade {
+		for _, id := range subDepIds {
+			err := DeleteAllSubDepartmentsByParentId(db, id, cascade, reassignToDepId)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	return nil
 }
 
-func GetSubDepartmentsByParentId(db gorm.DB, parentId int) []Department {
+func GetSubDepartmentsByParentId(db *gorm.DB, parentId int) []Department {
 	var subDeps []Department
 	db.Where("parent_id = ?", parentId).Find(&subDeps)
 
 	return subDeps
 }
 
-func HasSameDepartmentByParentIdAndName(db gorm.DB, d Department) (bool, error) {
+func HasSameDepartmentByParentIdAndName(db *gorm.DB, parentId int, dName string) (bool, error) {
 	var count int64
-	err := db.Model(&Department{}).Where("parent_id = ? AND name = ?", d.ParentId, d.Name).Count(&count).Error
+	err := db.Model(&Department{}).Where("parent_id = ? AND name = ?", parentId, dName).Count(&count).Error
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) && count == 0 {
 		return false, nil
 	}
@@ -119,4 +121,8 @@ func HasSameDepartmentByParentIdAndName(db gorm.DB, d Department) (bool, error) 
 	}
 
 	return false, err
+}
+
+func SaveDepartment(db *gorm.DB, d Department) {
+	db.Save(d)
 }

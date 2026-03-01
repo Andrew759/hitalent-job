@@ -6,19 +6,18 @@ import (
 	"hitalent/internal/middleware"
 	"hitalent/internal/model"
 	"net/http"
+	"strconv"
 )
 
 type DepartmentController struct {
 	Controller base.Controller
-	middleware.Validator
+	CreateDV   middleware.Validator
+	ChangeDV   middleware.Validator
 }
 
 func (dc *DepartmentController) HandleRequest() {
-	//TODO: строка - мок
-	dc.Controller.Dependencies.DBDecorator.GormInterface.AutoMigrate(&model.Department{}, &model.Employee{})
-
 	dc.Controller.ServeMux.HandleFunc("POST /departments",
-		dc.Validate(func(w http.ResponseWriter, r *http.Request) {
+		dc.CreateDV.Validate(func(w http.ResponseWriter, r *http.Request) {
 			dc.CreateDepartment(w, base.NewRequest(r))
 		}))
 
@@ -30,10 +29,14 @@ func (dc *DepartmentController) HandleRequest() {
 		dc.DeleteDepartment(w, base.NewRequest(r))
 	})
 
+	dc.Controller.ServeMux.HandleFunc("PATCH /departments/{id}",
+		dc.ChangeDV.Validate(func(w http.ResponseWriter, r *http.Request) {
+			dc.ChangeDepartmentParent(w, base.NewRequest(r))
+		}))
 }
 
 func (dc *DepartmentController) CreateDepartment(w http.ResponseWriter, r *base.Request) {
-	d := r.Context().Value(middleware.DepartmentKey).(*model.Department)
+	d := r.Context().Value(middleware.CreateDepartmentKey).(*model.Department)
 
 	err := model.CreateDepartment(dc.Controller.Dependencies.DBDecorator.GormInterface, d)
 	if err != nil {
@@ -50,8 +53,28 @@ func (dc *DepartmentController) GetDepartment(w http.ResponseWriter, r *base.Req
 		base.NewResponse().SendError(w, err.Error(), http.StatusBadRequest)
 	}
 
-	//TODO: вместо хардкода использовать query параметр
-	d, err := model.GetDepartmentTree(dc.Controller.Dependencies.DBDecorator.GormInterface, id, 5)
+	query := r.Request.URL.Query()
+	depthS := query.Get("depth")
+	var depth int
+	if depthS == "" {
+		depth = 1
+	}
+	depth, err = strconv.Atoi(depthS)
+	if depth > 5 {
+		base.NewResponse().SendError(w, errors.New("invalid depth").Error(), http.StatusBadRequest)
+		return
+	}
+	includeEmployees := true
+	includeEmployeesS := query.Get("include_employees")
+	if includeEmployeesS != "" {
+		includeEmployees, err = strconv.ParseBool(includeEmployeesS)
+		if err != nil {
+			base.NewResponse().SendError(w, errors.New("invalid include_employees param").Error(), http.StatusBadRequest)
+			return
+		}
+	}
+
+	d, err := model.GetDepartmentTree(dc.Controller.Dependencies.DBDecorator.GormInterface, id, depth, includeEmployees)
 	if err != nil && errors.Is(err, model.DepartmentNotFoundErr) {
 		base.NewResponse().SendError(w, err.Error(), http.StatusNotFound)
 		return
@@ -69,13 +92,45 @@ func (dc *DepartmentController) DeleteDepartment(w http.ResponseWriter, r *base.
 		base.NewResponse().SendError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	//TODO: это мок. Ид нужно достать из тела запроса
-	parentId := 1
-	err = model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, id, &parentId)
+
+	query := r.Request.URL.Query()
+	cascade := false
+	reassign := false
+
+	mode := query.Get("mode")
+	if mode == "cascade" {
+		cascade = true
+	}
+	if mode == "reassign" {
+		reassign = true
+	}
+
+	var reassignToDepartmentId *int
+	reassignToDepartmentIdS := query.Get("reassign_to_department_id")
+	if reassign && reassignToDepartmentIdS == "" {
+		base.NewResponse().SendError(w, errors.New("reassign_to_department_id required if mode reassign").Error(), http.StatusBadRequest)
+		return
+	}
+	reassignToDepartmentIdInt, err := strconv.Atoi(reassignToDepartmentIdS)
+	if err != nil {
+		base.NewResponse().SendError(w, errors.New("invalid reassign_to_department_id param").Error(), http.StatusBadRequest)
+		return
+	}
+	reassignToDepartmentId = &reassignToDepartmentIdInt
+
+	err = model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, id, cascade, reassignToDepartmentId)
 	if err != nil {
 		base.NewResponse().SendError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (dc *DepartmentController) ChangeDepartmentParent(w http.ResponseWriter, r *base.Request) {
+	d := r.Context().Value(middleware.ChangeDepartmentKey).(model.Department)
+
+	model.SaveDepartment(dc.Controller.Dependencies.DBDecorator.GormInterface, d)
+
+	base.NewResponse().SendSuccess(w, d, http.StatusOK)
 }

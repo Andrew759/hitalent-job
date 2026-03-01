@@ -9,7 +9,7 @@ import (
 )
 
 func BuildAndServe(dbDecorator service.DBDecorator) {
-	mux := buildServer(dbDecorator)
+	mux := BuildServer(dbDecorator)
 
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
@@ -17,7 +17,7 @@ func BuildAndServe(dbDecorator service.DBDecorator) {
 	}
 }
 
-func buildServer(dbDecorator service.DBDecorator) *http.ServeMux {
+func BuildServer(dbDecorator service.DBDecorator) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	diContainer := base.DIContainer{
@@ -34,7 +34,10 @@ func initOrganizationServer(mux *http.ServeMux, diContainer base.DIContainer) {
 			ServeMux:     mux,
 			Dependencies: diContainer,
 		},
-		Validator: middleware.DepartmentValidator{
+		CreateDV: middleware.CreateDepartmentValidator{
+			DBDecorator: diContainer.DBDecorator,
+		},
+		ChangeDV: middleware.ChangeDepartmentValidator{
 			DBDecorator: diContainer.DBDecorator,
 		},
 	}

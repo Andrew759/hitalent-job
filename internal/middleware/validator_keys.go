@@ -3,6 +3,7 @@ package middleware
 type contextKey string
 
 const (
-	DepartmentKey contextKey = "validateDepartment"
-	EmployeeKey   contextKey = "validateEmployee"
+	CreateDepartmentKey contextKey = "validateCreatedDepartment"
+	ChangeDepartmentKey contextKey = "validateChangedDepartment"
+	CreateEmployeeKey   contextKey = "validateCreatedEmployee"
 )
