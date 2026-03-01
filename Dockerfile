@@ -1,9 +1,11 @@
 ARG GOLANG_VERSION='1.25.7'
 
-FROM golang:${GOLANG_VERSION}-alpine as builder
+FROM golang:${GOLANG_VERSION}-alpine
 
+# Установка зависимостей и Delve
 RUN apk update && apk upgrade && \
-    apk add --no-cache bash git openssh
+    apk add --no-cache bash git openssh build-base && \
+    go install github.com/go-delve/delve/cmd/dlv@master
 
 WORKDIR /app
 
@@ -12,19 +14,11 @@ COPY ./go.mod ./go.sum ./
 RUN go mod download
 
 COPY ./ ./
-COPY ./.env.example .env
 
-RUN go build -o main ./cmd/main.go
+# Компиляция бинарника в корень (/main), а не в текущую папку (/app/main)
+RUN go build -gcflags="all=-N -l" -o /main ./cmd/main.go
 
-# Создается финальный образ
-FROM alpine:latest
+EXPOSE 8080 2345
 
-WORKDIR /root/
-
-# Копируется бинарник из стадии сборки
-COPY --from=builder . .
-
-EXPOSE 8080
-
-# Запуск приложения
-CMD ["./app/main"]
+# Запуск бинарника из корня с Delve
+CMD ["dlv", "--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient", "exec", "/main", "--continue"]

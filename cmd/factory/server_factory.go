@@ -3,13 +3,14 @@ package factory
 import (
 	"hitalent/cmd/service"
 	"hitalent/internal/base"
+	internalService "hitalent/internal/controller"
 	"hitalent/internal/middleware"
-	internalService "hitalent/internal/service"
+	"hitalent/internal/model"
 	"net/http"
 )
 
 func BuildAndServe(dbDecorator service.DBDecorator) {
-	mux := buildServer(dbDecorator)
+	mux := BuildServer(dbDecorator)
 
 	err := http.ListenAndServe(":8080", mux)
 	if err != nil {
@@ -17,13 +18,16 @@ func BuildAndServe(dbDecorator service.DBDecorator) {
 	}
 }
 
-func buildServer(dbDecorator service.DBDecorator) *http.ServeMux {
+func BuildServer(dbDecorator service.DBDecorator) *http.ServeMux {
 	mux := http.NewServeMux()
 
 	diContainer := base.DIContainer{
 		DBDecorator: dbDecorator,
 	}
 	initOrganizationServer(mux, diContainer)
+
+	//TODO: строка - мок таблиц. Удалить
+	dbDecorator.GormInterface.AutoMigrate(&model.Department{}, &model.Employee{})
 
 	return mux
 }
@@ -34,10 +38,26 @@ func initOrganizationServer(mux *http.ServeMux, diContainer base.DIContainer) {
 			ServeMux:     mux,
 			Dependencies: diContainer,
 		},
-		Validator: middleware.DepartmentValidator{
+		CreateDV: middleware.CreateDepartmentValidator{
+			DBDecorator: diContainer.DBDecorator,
+		},
+		ChangeDV: middleware.ChangeDepartmentValidator{
+			DBDecorator: diContainer.DBDecorator,
+		},
+		DeleteDV: middleware.DeleteDepartmentValidator{
+			DBDecorator: diContainer.DBDecorator,
+		},
+	}
+	employeeController := internalService.EmployeeController{
+		Controller: base.Controller{
+			ServeMux:     mux,
+			Dependencies: diContainer,
+		},
+		Validator: middleware.EmployeeValidator{
 			DBDecorator: diContainer.DBDecorator,
 		},
 	}
 
 	departmentController.HandleRequest()
+	employeeController.HandleRequest()
 }
