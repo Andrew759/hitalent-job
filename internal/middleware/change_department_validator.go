@@ -39,21 +39,22 @@ func (dv ChangeDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 			return
 		}
 
-		//TODO: вынести в метод валидации БД (по возможности)
+		//TODO: вынести в метод валидации БД (если будет время)
 		bRequest := base.NewRequest(r)
 		id, err := bRequest.HTTPId()
 		if err != nil {
 			base.NewResponse().SendError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		d, err := model.GetDepartmentById(dv.DBDecorator.GormInterface, id)
+		d, err := model.GetDepartmentById(dv.GormInterface, id)
 		if err != nil && errors.Is(err, model.DepartmentNotFoundErr) {
 			base.NewResponse().SendError(w, err.Error(), http.StatusNotFound)
 			return
 		}
 
-		if d.Id == *cdr.ParentId {
-			base.NewResponse().SendError(w, "cannot create a department as its own parent", http.StatusConflict)
+		vErr = dv.validateSubDepsTreeCycle(d.Id, *cdr.ParentId)
+		if vErr != nil {
+			base.NewResponse().SendError(w, vErr.Message, vErr.Code)
 			return
 		}
 
@@ -67,7 +68,7 @@ func (dv ChangeDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 	}
 }
 
-// Множественная валидация параметров, в случае, если при ваSaveDepartmentлидации не требуется дергать БД
+// Множественная валидация параметров, в случае, если при валидации не требуется дергать БД
 func (dv ChangeDepartmentValidator) validateRequestRules(cdr request.ChangeDepartmentRequest) []error {
 	var errList []error
 
@@ -83,7 +84,7 @@ func (dv ChangeDepartmentValidator) validateRequestRules(cdr request.ChangeDepar
 
 // Валидация правил, которые требуют проверок в БД
 func (dv ChangeDepartmentValidator) validateAndPrepareResponseByDBRules(cdr request.ChangeDepartmentRequest) *ValidatorError {
-	_, err := model.HasSameDepartmentByParentIdAndName(dv.DBDecorator.GormInterface, *cdr.Name, cdr.ParentId)
+	_, err := model.HasSameDepartmentByParentIdAndName(dv.GormInterface, *cdr.Name, cdr.ParentId)
 	if err != nil && errors.Is(err, model.DepartmentAlreadyExists) {
 		return &ValidatorError{
 			Message: err.Error(),
@@ -93,6 +94,31 @@ func (dv ChangeDepartmentValidator) validateAndPrepareResponseByDBRules(cdr requ
 		return &ValidatorError{
 			Message: err.Error(),
 			Code:    http.StatusInternalServerError,
+		}
+	}
+
+	return nil
+}
+
+func (dv ChangeDepartmentValidator) validateSubDepsTreeCycle(currentDepId, newParentId int) *ValidatorError {
+	if currentDepId == newParentId {
+		return &ValidatorError{
+			Message: "cannot create a department as its own parent",
+			Code:    http.StatusConflict,
+		}
+	}
+
+	subDeps := model.GetSubDepartmentsByParentId(dv.DBDecorator.GormInterface, currentDepId)
+	for _, sub := range subDeps {
+		if sub.Id == newParentId {
+			return &ValidatorError{
+				Message: "circular reference: cannot move department into its own subtree",
+				Code:    http.StatusConflict,
+			}
+		}
+
+		if vErr := dv.validateSubDepsTreeCycle(sub.Id, newParentId); vErr != nil {
+			return vErr
 		}
 	}
 

@@ -8,12 +8,15 @@ import (
 )
 
 type Department struct {
-	Id          int                             `json:"id" gorm:"primaryKey;autoIncrement"`
-	Name        string                          `json:"name" gorm:"not null;size:200;uniqueIndex:idx_name_parent"`
-	ParentId    *int                            `json:"parentId" gorm:"index:idx_name_parent"`
-	CreatedAt   time.TimestampWithTimeZoneMicro `json:"created_at"`
-	Departments []Department                    `json:"children" gorm:"foreignKey:ParentId"`
-	Employees   []Employee                      `json:"employees" gorm:"foreignKey:DepartmentId"`
+	Id        int                             `json:"id" gorm:"primaryKey;autoIncrement"`
+	Name      string                          `json:"name" gorm:"not null;size:200;uniqueIndex:idx_name_parent"`
+	ParentId  *int                            `json:"parentId" gorm:"index:idx_name_parent"`
+	CreatedAt time.TimestampWithTimeZoneMicro `json:"created_at"`
+	//TODO: как я понимаю - тут противоречение на уровне ограничений и бизнес требований
+	// Здесь нельзя выставить каскадное удаление на уровне бд, тк в этом случае перестанет работать логика
+	// связанная с mode query параметром
+	Departments []Department `json:"children" gorm:"foreignKey:ParentId"`
+	Employees   []Employee   `json:"employees" gorm:"foreignKey:DepartmentId"`
 }
 
 var DepartmentNotFoundErr = errors.New("department not found")
@@ -106,7 +109,7 @@ func GetSubDepartmentsByParentId(db *gorm.DB, parentId int) []Department {
 }
 
 func HasSameDepartmentByParentIdAndName(db *gorm.DB, dName string, parentId *int) (bool, error) {
-	//TODO: если parentId = null, то сейчас код позволяет сохранить еще один департамент с тем же именем
+	//TODO: если parentId = null, код позволяет сохранить еще один департамент с тем же именем
 	var count int64
 	err := db.Model(&Department{}).Where("parent_id = ? AND name = ?", parentId, dName).Count(&count).Error
 	if err != nil && errors.Is(err, gorm.ErrRecordNotFound) && count == 0 {
