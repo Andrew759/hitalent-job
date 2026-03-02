@@ -10,13 +10,13 @@ import (
 type Department struct {
 	Id        int                             `json:"id" gorm:"primaryKey;autoIncrement"`
 	Name      string                          `json:"name" gorm:"not null;size:200;uniqueIndex:idx_name_parent"`
-	ParentId  *int                            `json:"parentId" gorm:"index:idx_name_parent"`
+	ParentId  *int                            `json:"parentId" gorm:"uniqueIndex:idx_name_parent"`
 	CreatedAt time.TimestampWithTimeZoneMicro `json:"created_at"`
 	//TODO: как я понимаю - тут противоречение на уровне ограничений и бизнес требований
 	// Здесь нельзя выставить каскадное удаление на уровне бд, тк в этом случае перестанет работать логика
 	// связанная с mode query параметром
-	Departments []Department `json:"children" gorm:"foreignKey:ParentId"`
-	Employees   []Employee   `json:"employees" gorm:"foreignKey:DepartmentId"`
+	Departments []Department `json:"children" gorm:"foreignKey:ParentId;constraint:OnDelete:CASCADE"`
+	Employees   []Employee   `json:"employees" gorm:"foreignKey:DepartmentId;constraint:OnDelete:CASCADE"`
 }
 
 var DepartmentNotFoundErr = errors.New("department not found")

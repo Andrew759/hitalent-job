@@ -3,9 +3,10 @@
 CREATE TABLE IF NOT EXISTS employees
 (
     id            bigserial PRIMARY KEY,
-    department_id BIGINT       NOT NULL
-    CONSTRAINT fk_departments_employees
-    REFERENCES departments(id),
+    department_id BIGINT       NOT NULL,
+        CONSTRAINT fk_departments_employees
+            FOREIGN KEY (department_id)
+            REFERENCES departments(id),
     full_name     VARCHAR(200) NOT NULL,
     position      VARCHAR(200) NOT NULL,
     hired_at      TIMESTAMP WITH TIME ZONE,

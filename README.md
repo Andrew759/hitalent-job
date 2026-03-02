@@ -22,4 +22,4 @@
 1. На локальной машине должен быть установлен goose - github.com/pressly/goose
 2. В папке sql проекта нужно выполнить команду goose postgres "host=localhost user=Пользователь password=ПАРОЛЬ dbname=db sslmode=disable" up
 3. Для отката миграций использовать команду  goose postgres "host=localhost user=Пользователь password=ПАРОЛЬ dbname=db sslmode=disable" down
-4. Пароль и пользователь должен соответствовать 
+4. Пароль и пользователь должен соответствовать данным из .env файла 
