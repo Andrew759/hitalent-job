@@ -79,7 +79,6 @@ func (r *Response) Send(w http.ResponseWriter, code int) {
 	_ = json.NewEncoder(w).Encode(r)
 }
 
-// TODO: использовать в автотестах
 // Read внутренняя функция для возможности декодирования payload в сущности
 func (pc *PayloadContainer) Read(p []byte) (n int, err error) {
 	if pc.buf == nil {
