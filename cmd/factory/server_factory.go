@@ -5,7 +5,6 @@ import (
 	"hitalent/internal/base"
 	internalService "hitalent/internal/controller"
 	"hitalent/internal/middleware"
-	"hitalent/internal/model"
 	"net/http"
 )
 
@@ -25,9 +24,6 @@ func BuildServer(dbDecorator service.DBDecorator) *http.ServeMux {
 		DBDecorator: dbDecorator,
 	}
 	initOrganizationServer(mux, diContainer)
-
-	//TODO: строка - мок таблиц. Удалить
-	dbDecorator.GormInterface.AutoMigrate(&model.Department{}, &model.Employee{})
 
 	return mux
 }
