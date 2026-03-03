@@ -3,6 +3,7 @@ module hitalent
 go 1.25.7
 
 require (
+	github.com/brianvoe/gofakeit/v7 v7.14.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect

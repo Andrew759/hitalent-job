@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -198,7 +199,7 @@ func TestCreateChildDepartmentWithSameNameFail(t *testing.T) {
 }
 
 // TODO: пограничный кейс. Вряд ли такое будет на проде. Сейчас выдает 500
-func TestPlacingDepartmentInsideOwnSubtreeFail(t *testing.T) {
+func TestPlacingDepartmentInsideOwnSubtreeOnFirstLevelFail(t *testing.T) {
 	t.Skip()
 	tContainer := base.PrepareTestContainer(t)
 
@@ -218,4 +219,24 @@ func TestPlacingDepartmentInsideOwnSubtreeFail(t *testing.T) {
 	json.NewDecoder(fResp.Body).Decode(&fDecodedResponse)
 	var rootDepartment model.Department
 	json.NewDecoder(fDecodedResponse.PayloadContainer).Decode(&rootDepartment)
+}
+
+func TestDepartmentNameLenFail(t *testing.T) {
+	tContainer := base.PrepareTestContainer(t)
+
+	newDepartmentRequest := request.CreateDepartmentRequest{
+		Name: gofakeit.LetterN(201),
+	}
+	body, _ := json.Marshal(newDepartmentRequest)
+
+	resp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	var decodedResponse appBase.Response
+	json.NewDecoder(resp.Body).Decode(&decodedResponse)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, "invalid department name length", decodedResponse.ErrorContainer[0].Message)
 }
