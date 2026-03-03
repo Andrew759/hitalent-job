@@ -77,6 +77,12 @@ func sortedEmployees(db *gorm.DB) *gorm.DB {
 
 // DeleteAllSubDepartmentsByParentId TODO: избавиться от циклов и переписать всё на нативный SQL запрос?
 func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, cascade bool, reassignToDepId *int) error {
+	if reassignToDepId != nil {
+		err := ReassignEmployeeToDepById(*db, parentId, *reassignToDepId)
+		if err != nil {
+			return err
+		}
+	}
 	if cascade {
 		subDeps := GetSubDepartmentsByParentId(db, parentId)
 		for _, sub := range subDeps {
@@ -84,13 +90,6 @@ func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, cascade bool, 
 			if err != nil {
 				return err
 			}
-		}
-	}
-
-	if reassignToDepId != nil {
-		err := ReassignEmployeeToDepById(*db, parentId, *reassignToDepId)
-		if err != nil {
-			return err
 		}
 	}
 
