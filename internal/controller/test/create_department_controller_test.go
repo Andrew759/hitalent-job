@@ -240,3 +240,23 @@ func TestDepartmentNameLenFail(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "invalid department name length", decodedResponse.ErrorContainer[0].Message)
 }
+
+func TestDepartmentEmptyNameFail(t *testing.T) {
+	tContainer := base.PrepareTestContainer(t)
+
+	newDepartmentRequest := request.CreateDepartmentRequest{
+		Name: "",
+	}
+	body, _ := json.Marshal(newDepartmentRequest)
+
+	resp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	var decodedResponse appBase.Response
+	json.NewDecoder(resp.Body).Decode(&decodedResponse)
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+	assert.Equal(t, "empty department name", decodedResponse.ErrorContainer[0].Message)
+}
