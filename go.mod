@@ -1,6 +1,6 @@
 module hitalent
 
-go 1.25.7
+go 1.26.3
 
 require (
 	github.com/brianvoe/gofakeit/v7 v7.14.0 // indirect

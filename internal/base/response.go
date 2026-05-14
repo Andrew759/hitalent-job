@@ -12,7 +12,7 @@ type Response struct {
 }
 
 type PayloadContainer struct {
-	Payload interface{}   `json:"omitempty"`
+	Payload interface{}   `json:"payload,omitempty"`
 	buf     *bytes.Reader // Внутренний буфер для чтения
 }
 

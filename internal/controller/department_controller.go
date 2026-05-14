@@ -118,12 +118,7 @@ func (dc *DepartmentController) DeleteDepartment(w http.ResponseWriter, r *base.
 		return
 	}
 
-	var reassignToDepartmentId *int
-	if reassignToDepartmentIdInt == 0 {
-		reassignToDepartmentId = nil
-	}
-
-	err = model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, id, cascade, reassignToDepartmentId)
+	err = model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, id, cascade, &reassignToDepartmentIdInt)
 	if err != nil {
 		base.NewResponse().SendError(w, err.Error(), http.StatusInternalServerError)
 		return

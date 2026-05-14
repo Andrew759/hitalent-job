@@ -26,7 +26,7 @@ func PrepareDatabaseConfig() dto.DatabaseConfig {
 	dbc := dto.DatabaseConfig{}
 
 	dbc.SetHost(viper.GetString(enviromentNames.DbHost))
-	dbc.SetPort(viper.GetInt(enviromentNames.DbPort))
+	dbc.SetPort(viper.GetInt(enviromentNames.DbInternalPort))
 	dbc.SetName(viper.GetString(enviromentNames.DbName))
 	dbc.SetUser(viper.GetString(enviromentNames.DbUser))
 	dbc.SetPassword(viper.GetString(enviromentNames.DbPass))

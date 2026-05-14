@@ -4,12 +4,12 @@ services:
       context: .
       dockerfile: ./Dockerfile
     ports:
-      - "8081:8080"
-      - "2345:2345" # Порт для связи GoLand с Delve
+      - "${API_PORT:-8080}:8080"
+      - "${DELVE_PORT:-2345}:2345"
     cap_add:
       - SYS_PTRACE
     security_opt:
-      - "seccomp=unconfined" # Отключает фильтрацию системных вызовов
+      - "seccomp=unconfined"
     depends_on:
       postgres:
         condition: service_healthy
@@ -19,7 +19,7 @@ services:
       - backend
 
   postgres:
-    image: postgres:17.2
+    image: postgres:18.3
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -29,7 +29,7 @@ services:
     networks:
       - backend
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./postgres_data:/var/lib/postgresql
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U ${DB_USER}" ]
       interval: 5s

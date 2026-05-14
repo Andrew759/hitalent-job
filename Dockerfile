@@ -1,8 +1,7 @@
-ARG GOLANG_VERSION='1.25.7'
+ARG GOLANG_VERSION='1.26.3'
 
 FROM golang:${GOLANG_VERSION}-alpine
 
-# Установка зависимостей и Delve
 RUN apk update && apk upgrade && \
     apk add --no-cache bash git openssh build-base && \
     go install github.com/go-delve/delve/cmd/dlv@master
@@ -15,8 +14,8 @@ RUN go mod download
 
 COPY ./ ./
 
-# Компиляция бинарника в корень (/main), а не в текущую папку (/app/main)
-RUN go build -gcflags="all=-N -l" -o /main ./cmd/main.go
+COPY main /main
+RUN chmod +x /main
 
 EXPOSE 8080 2345
 
