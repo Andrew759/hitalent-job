@@ -27,6 +27,8 @@ func (dv CreateDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 			base.NewResponse().SendError(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		cdr.Name = strings.TrimSpace(cdr.Name)
+
 		if errorList := dv.validateRequestRules(cdr); len(errorList) > 0 {
 			errResponse := base.NewResponse()
 			errResponse.AddErrorsToErrorContainer(errorList)
@@ -44,7 +46,7 @@ func (dv CreateDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 		//Секция установки параметров после валидации
 		var d model.Department
 		d.ParentId = cdr.ParentId
-		d.Name = strings.TrimSpace(cdr.Name)
+		d.Name = cdr.Name
 		d.CreatedAt = twtm.TimestampWithTimeZoneMicro{Time: time.Now()}
 
 		ctx := context.WithValue(r.Context(), CreateDepartmentKey, &d)
@@ -68,6 +70,23 @@ func (dv CreateDepartmentValidator) validateRequestRules(cdr request.CreateDepar
 
 // Валидация правил, которые требуют проверок в БД
 func (dv CreateDepartmentValidator) validateAndPrepareResponseByDBRules(cdr request.CreateDepartmentRequest) *ValidatorError {
+	if cdr.ParentId != nil {
+		_, err := model.GetDepartmentById(dv.GormInterface, *cdr.ParentId)
+		if err != nil {
+			if errors.Is(err, model.DepartmentNotFoundErr) {
+				return &ValidatorError{
+					Message: "parent department not found",
+					Code:    http.StatusNotFound,
+				}
+			}
+
+			return &ValidatorError{
+				Message: err.Error(),
+				Code:    http.StatusInternalServerError,
+			}
+		}
+	}
+
 	_, err := model.HasSameDepartmentByParentIdAndName(dv.DBDecorator.GormInterface, cdr.Name, cdr.ParentId)
 	if err != nil && errors.Is(err, model.DepartmentAlreadyExists) {
 		return &ValidatorError{

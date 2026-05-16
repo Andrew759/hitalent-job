@@ -5,6 +5,7 @@ import (
 	"hitalent/internal/base"
 	"hitalent/internal/middleware"
 	"hitalent/internal/model"
+	"hitalent/internal/request"
 	"net/http"
 	"strconv"
 )
@@ -62,7 +63,7 @@ func (dc *DepartmentController) GetDepartment(w http.ResponseWriter, r *base.Req
 		depth = 1
 	}
 	depth, err = strconv.Atoi(depthS)
-	if depth > 5 {
+	if depth > 5 || err != nil {
 		base.NewResponse().SendError(w, errors.New("invalid depth").Error(), http.StatusBadRequest)
 		return
 	}
@@ -89,36 +90,9 @@ func (dc *DepartmentController) GetDepartment(w http.ResponseWriter, r *base.Req
 }
 
 func (dc *DepartmentController) DeleteDepartment(w http.ResponseWriter, r *base.Request) {
-	id, err := r.HTTPId()
-	if err != nil {
-		base.NewResponse().SendError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+	ddr := r.Context().Value(middleware.DeleteDepartmentRequestKey).(*request.DeleteDepartmentRequest)
 
-	query := r.Request.URL.Query()
-	cascade := false
-	reassign := false
-
-	mode := query.Get("mode")
-	if mode == "cascade" {
-		cascade = true
-	}
-	if mode == "reassign" {
-		reassign = true
-	}
-
-	reassignToDepartmentIdS := query.Get("reassign_to_department_id")
-	if reassign && reassignToDepartmentIdS == "" {
-		base.NewResponse().SendError(w, errors.New("reassign_to_department_id required if mode reassign").Error(), http.StatusBadRequest)
-		return
-	}
-	reassignToDepartmentIdInt, err := strconv.Atoi(reassignToDepartmentIdS)
-	if reassign && err != nil {
-		base.NewResponse().SendError(w, errors.New("invalid reassign_to_department_id param").Error(), http.StatusBadRequest)
-		return
-	}
-
-	err = model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, id, cascade, &reassignToDepartmentIdInt)
+	err := model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, ddr.DepartmentId, ddr.Cascade, ddr.ReassignToDepartmentId)
 	if err != nil {
 		base.NewResponse().SendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -130,7 +104,11 @@ func (dc *DepartmentController) DeleteDepartment(w http.ResponseWriter, r *base.
 func (dc *DepartmentController) ChangeDepartmentParent(w http.ResponseWriter, r *base.Request) {
 	d := r.Context().Value(middleware.ChangeDepartmentKey).(*model.Department)
 
-	model.SaveDepartment(dc.Controller.Dependencies.DBDecorator.GormInterface, d)
+	err := model.SaveDepartment(dc.Controller.Dependencies.DBDecorator.GormInterface, d)
+	if err != nil {
+		base.NewResponse().SendError(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	base.NewResponse().SendSuccess(w, d, http.StatusOK)
 }

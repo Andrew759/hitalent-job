@@ -25,6 +25,10 @@ func (dv ChangeDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 			base.NewResponse().SendError(w, "Invalid JSON: "+err.Error(), http.StatusBadRequest)
 			return
 		}
+		if cdr.Name != nil {
+			cdr.Name = new(strings.TrimSpace(*cdr.Name))
+		}
+
 		if errorList := dv.validateRequestRules(cdr); len(errorList) > 0 {
 			errResponse := base.NewResponse()
 			errResponse.AddErrorsToErrorContainer(errorList)
@@ -33,26 +37,14 @@ func (dv ChangeDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 			return
 		}
 
-		vErr := dv.validateAndPrepareResponseByDBRules(cdr)
-		if vErr != nil {
-			base.NewResponse().SendError(w, vErr.Message, vErr.Code)
-			return
-		}
-
-		//TODO: вынести в метод валидации БД (если будет время)
 		bRequest := base.NewRequest(r)
 		id, err := bRequest.HTTPId()
 		if err != nil {
 			base.NewResponse().SendError(w, err.Error(), http.StatusBadRequest)
 			return
 		}
-		d, err := model.GetDepartmentById(dv.GormInterface, id)
-		if err != nil && errors.Is(err, model.DepartmentNotFoundErr) {
-			base.NewResponse().SendError(w, err.Error(), http.StatusNotFound)
-			return
-		}
 
-		vErr = dv.validateSubDepsTreeCycle(d.Id, *cdr.ParentId)
+		d, vErr := dv.validateAndPrepareResponseByDBRules(cdr, id)
 		if vErr != nil {
 			base.NewResponse().SendError(w, vErr.Message, vErr.Code)
 			return
@@ -60,10 +52,10 @@ func (dv ChangeDepartmentValidator) Validate(next http.HandlerFunc) http.Handler
 
 		d.ParentId = cdr.ParentId
 		if cdr.Name != nil {
-			d.Name = strings.TrimSpace(*cdr.Name)
+			d.Name = *cdr.Name
 		}
 
-		ctx := context.WithValue(r.Context(), ChangeDepartmentKey, &d)
+		ctx := context.WithValue(r.Context(), ChangeDepartmentKey, d)
 		next(w, r.WithContext(ctx))
 	}
 }
@@ -83,21 +75,41 @@ func (dv ChangeDepartmentValidator) validateRequestRules(cdr request.ChangeDepar
 }
 
 // Валидация правил, которые требуют проверок в БД
-func (dv ChangeDepartmentValidator) validateAndPrepareResponseByDBRules(cdr request.ChangeDepartmentRequest) *ValidatorError {
+func (dv ChangeDepartmentValidator) validateAndPrepareResponseByDBRules(cdr request.ChangeDepartmentRequest, depId int) (*model.Department, *ValidatorError) {
 	_, err := model.HasSameDepartmentByParentIdAndName(dv.GormInterface, *cdr.Name, cdr.ParentId)
 	if err != nil && errors.Is(err, model.DepartmentAlreadyExists) {
-		return &ValidatorError{
+		return nil, &ValidatorError{
 			Message: err.Error(),
 			Code:    http.StatusConflict,
 		}
 	} else if err != nil {
-		return &ValidatorError{
+		return nil, &ValidatorError{
 			Message: err.Error(),
 			Code:    http.StatusInternalServerError,
 		}
 	}
 
-	return nil
+	d, err := model.GetDepartmentById(dv.GormInterface, depId)
+	if err != nil {
+		if errors.Is(err, model.DepartmentNotFoundErr) {
+			return nil, &ValidatorError{
+				Message: err.Error(),
+				Code:    http.StatusNotFound,
+			}
+		}
+
+		return nil, &ValidatorError{
+			Message: err.Error(),
+			Code:    http.StatusInternalServerError,
+		}
+	}
+
+	vErr := dv.validateSubDepsTreeCycle(d.Id, *cdr.ParentId)
+	if vErr != nil {
+		return nil, vErr
+	}
+
+	return &d, nil
 }
 
 func (dv ChangeDepartmentValidator) validateSubDepsTreeCycle(currentDepId, newParentId int) *ValidatorError {

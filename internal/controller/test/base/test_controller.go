@@ -87,7 +87,6 @@ func DropTables(db service.DBDecorator) {
 	if err != nil {
 		panic("failed to drop department table: " + err.Error())
 	}
-	//TODO: проверить, возможно тут ошибка из-за каскадного удаления department
 	_, err = db.NativeDB().Exec("DROP TABLE IF EXISTS " + employeeTName + " CASCADE;")
 	if err != nil {
 		panic("failed to drop employee table: " + err.Error())

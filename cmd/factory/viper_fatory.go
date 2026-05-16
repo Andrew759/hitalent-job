@@ -14,8 +14,7 @@ func InitViper() {
 
 func readConfig() {
 	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); ok {
 			panic(fmt.Errorf("hitalent config file not found: %w", err))
 		}
 		panic(fmt.Errorf("viper fatal error: %w", err))

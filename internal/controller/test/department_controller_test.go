@@ -45,7 +45,7 @@ func TestCreateDepartmentSuccess(t *testing.T) {
 	assert.Equal(t, truncatedExpectedTime, truncatedActualTime)
 }
 
-// null не является значимым параметром, поэтому в пределах корня отделов можно создать департамент с одним именем
+// по обновленной логике нельзя создать два департамента с одинаковыми в корне, если parent_id = null
 func TestCreateChildDepartmentSuccess(t *testing.T) {
 	tContainer := base.PrepareTestContainer(t)
 
@@ -72,7 +72,7 @@ func TestCreateChildDepartmentSuccess(t *testing.T) {
 	)
 
 	assert.Equal(t, http.StatusCreated, fResp.StatusCode)
-	assert.Equal(t, http.StatusCreated, sResp.StatusCode)
+	assert.Equal(t, http.StatusConflict, sResp.StatusCode)
 }
 
 // Создание дерева отделов с вложенностью 2 подотдела
@@ -198,16 +198,13 @@ func TestCreateChildDepartmentWithSameNameFail(t *testing.T) {
 	assert.Equal(t, http.StatusConflict, scResp.StatusCode)
 }
 
-// TODO: пограничный кейс. Вряд ли такое будет на проде. Сейчас выдает 500
 func TestPlacingDepartmentInsideOwnSubtreeOnFirstLevelFail(t *testing.T) {
-	t.Skip()
 	tContainer := base.PrepareTestContainer(t)
 
 	//Первый департамент
-	parentId := 1
 	firstDepartmentRequest := request.CreateDepartmentRequest{
 		Name:     "ИТ отдел",
-		ParentId: &parentId,
+		ParentId: new(1),
 	}
 	body, _ := json.Marshal(firstDepartmentRequest)
 	fResp, _ := tContainer.HTTPClient.Post(
@@ -217,8 +214,7 @@ func TestPlacingDepartmentInsideOwnSubtreeOnFirstLevelFail(t *testing.T) {
 	)
 	var fDecodedResponse appBase.Response
 	json.NewDecoder(fResp.Body).Decode(&fDecodedResponse)
-	var rootDepartment model.Department
-	json.NewDecoder(fDecodedResponse.PayloadContainer).Decode(&rootDepartment)
+	assert.Equal(t, "parent department not found", fDecodedResponse.ErrorContainer[0].Message)
 }
 
 func TestDepartmentNameLenFail(t *testing.T) {
