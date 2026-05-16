@@ -4,6 +4,7 @@ import (
 	"hitalent/internal/base"
 	"hitalent/internal/middleware"
 	"hitalent/internal/model"
+	"log/slog"
 	"net/http"
 )
 
@@ -27,7 +28,8 @@ func (ec *EmployeeController) CreateEmployee(
 
 	err := model.CreateEmployee(ec.Controller.Dependencies.DBDecorator.GormInterface, e)
 	if err != nil {
-		base.NewResponse().SendError(w, "Failed to create employee. "+err.Error(), http.StatusInternalServerError)
+		slog.Error("failed to create employee", "id", e.Id, "full_name", e.FullName)
+		base.NewResponse().SendError(w, "failed to create employee. "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
