@@ -73,22 +73,31 @@ func sortedEmployees(db *gorm.DB) *gorm.DB {
 	return db.Order("created_at DESC")
 }
 
-// DeleteAllSubDepartmentsByParentId TODO: избавиться от циклов и переписать всё на нативный SQL запрос?
-func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, cascade bool, reassignToDepId int) error {
+// DeleteAllSubDepartmentsByParentId удаляет поддепартаменты используя рекурсивные CTE PostgreSQL.
+func DeleteAllSubDepartmentsByParentId(db *gorm.DB, parentId int, reassignToDepId int) error {
 	return db.Transaction(func(tx *gorm.DB) error {
+		depTable := tx.NamingStrategy.TableName("Department")
+		empTable := tx.NamingStrategy.TableName("Employee")
+
 		if reassignToDepId != 0 {
-			err := ReassignEmployeeToDepById(tx, parentId, reassignToDepId)
-			if err != nil {
+			//Важно! Валидация существования департамента должна происходить заранее в валидаторе
+			// входных параметров
+
+			moveEmployeeQuery := `
+				UPDATE ` + empTable + ` 
+				SET department_id = ? 
+				WHERE department_id IN (
+					WITH RECURSIVE sub_deps AS (
+						SELECT id FROM ` + depTable + ` WHERE id = ?
+						UNION ALL
+						SELECT d.id FROM ` + depTable + ` d 
+						INNER JOIN sub_deps sd ON d.parent_id = sd.id
+					)
+					SELECT id FROM sub_deps
+				)
+			`
+			if err := tx.Exec(moveEmployeeQuery, reassignToDepId, parentId).Error; err != nil {
 				return err
-			}
-		}
-		if cascade {
-			subDeps := GetSubDepartmentsByParentId(db, parentId)
-			for _, sub := range subDeps {
-				err := DeleteAllSubDepartmentsByParentId(db, sub.Id, cascade, reassignToDepId)
-				if err != nil {
-					return err
-				}
 			}
 		}
 

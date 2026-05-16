@@ -92,7 +92,7 @@ func (dc *DepartmentController) GetDepartment(w http.ResponseWriter, r *base.Req
 func (dc *DepartmentController) DeleteDepartment(w http.ResponseWriter, r *base.Request) {
 	ddr := r.Context().Value(middleware.DeleteDepartmentRequestKey).(*request.DeleteDepartmentRequest)
 
-	err := model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, ddr.DepartmentId, ddr.Cascade, ddr.ReassignToDepartmentId)
+	err := model.DeleteAllSubDepartmentsByParentId(dc.Controller.Dependencies.DBDecorator.GormInterface, ddr.DepartmentId, ddr.ReassignToDepartmentId)
 	if err != nil {
 		base.NewResponse().SendError(w, err.Error(), http.StatusInternalServerError)
 		return
