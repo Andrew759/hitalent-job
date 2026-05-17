@@ -2,12 +2,14 @@ package test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	appBase "hitalent/internal/base"
 	"hitalent/internal/controller/test/base"
 	"hitalent/internal/model"
 	"hitalent/internal/request"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -202,10 +204,12 @@ func TestPlacingDepartmentInsideOwnSubtreeOnFirstLevelFail(t *testing.T) {
 	tContainer := base.PrepareTestContainer(t)
 
 	//Первый департамент
+	parentId := 1
 	firstDepartmentRequest := request.CreateDepartmentRequest{
 		Name:     "ИТ отдел",
-		ParentId: new(1),
+		ParentId: &parentId,
 	}
+
 	body, _ := json.Marshal(firstDepartmentRequest)
 	fResp, _ := tContainer.HTTPClient.Post(
 		tContainer.HTTPServer.URL+"/departments",
@@ -255,4 +259,113 @@ func TestDepartmentEmptyNameFail(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 	assert.Equal(t, "empty department name", decodedResponse.ErrorContainer[0].Message)
+}
+
+func TestChangeDepartmentSuccess(t *testing.T) {
+	tContainer := base.PrepareTestContainer(t)
+	newDepartmentRequest := request.CreateDepartmentRequest{
+		Name: "ИТ отдел",
+	}
+	body, _ := json.Marshal(newDepartmentRequest)
+
+	resp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	var decodedResponse appBase.Response
+	json.NewDecoder(resp.Body).Decode(&decodedResponse)
+
+	var createdDepartment model.Department
+	json.NewDecoder(decodedResponse.PayloadContainer).Decode(&createdDepartment)
+
+	name := "Ит отдел изменённый"
+	changeDepartmentRequest := request.ChangeDepartmentRequest{
+		Name: &name,
+	}
+	body, _ = json.Marshal(changeDepartmentRequest)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(
+		ctx,
+		http.MethodPatch,
+		tContainer.HTTPServer.URL+"/departments/"+strconv.Itoa(createdDepartment.Id),
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	changeResp, _ := tContainer.HTTPClient.Do(req)
+	var decodedChangeDepResponse appBase.Response
+	json.NewDecoder(changeResp.Body).Decode(&decodedChangeDepResponse)
+
+	var changedDepartment model.Department
+	json.NewDecoder(decodedChangeDepResponse.PayloadContainer).Decode(&changedDepartment)
+
+	assert.Equal(t, resp.StatusCode, http.StatusCreated)
+	assert.Equal(t, "ИТ отдел", createdDepartment.Name)
+	assert.Equal(t, changeResp.StatusCode, http.StatusOK)
+	assert.Equal(t, "Ит отдел изменённый", changedDepartment.Name)
+}
+
+func TestChangeDepartmentEmptyParentIdSuccess(t *testing.T) {
+	tContainer := base.PrepareTestContainer(t)
+	newDepartmentRequest := request.CreateDepartmentRequest{
+		Name: "ИТ отдел",
+	}
+	body, _ := json.Marshal(newDepartmentRequest)
+
+	resp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	var decodedResponse appBase.Response
+	json.NewDecoder(resp.Body).Decode(&decodedResponse)
+
+	var createdDepartment model.Department
+	json.NewDecoder(decodedResponse.PayloadContainer).Decode(&createdDepartment)
+
+	secondDepartmentRequest := request.CreateDepartmentRequest{
+		Name:     "ИТ отдел",
+		ParentId: &createdDepartment.Id,
+	}
+	body, _ = json.Marshal(secondDepartmentRequest)
+
+	resp, _ = tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	var secondDepDecodedResponse appBase.Response
+	json.NewDecoder(resp.Body).Decode(&secondDepDecodedResponse)
+
+	var secondDepartment model.Department
+	json.NewDecoder(secondDepDecodedResponse.PayloadContainer).Decode(&secondDepartment)
+
+	//в мапе нет parent_id, значит он не должен изменяться
+	bodyData := map[string]string{"name": "Ит отдел изменённый"}
+	body, _ = json.Marshal(bodyData)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(
+		ctx,
+		http.MethodPatch,
+		tContainer.HTTPServer.URL+"/departments/"+strconv.Itoa(secondDepartment.Id),
+		bytes.NewBuffer(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+
+	changeResp, _ := tContainer.HTTPClient.Do(req)
+	var decodedChangeDepResponse appBase.Response
+	json.NewDecoder(changeResp.Body).Decode(&decodedChangeDepResponse)
+
+	var changedDepartment model.Department
+	json.NewDecoder(decodedChangeDepResponse.PayloadContainer).Decode(&changedDepartment)
+
+	assert.Equal(t, "Ит отдел изменённый", changedDepartment.Name)
+	assert.Equal(t, createdDepartment.Id, *changedDepartment.ParentId)
 }
