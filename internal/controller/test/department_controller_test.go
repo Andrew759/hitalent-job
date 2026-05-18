@@ -30,6 +30,8 @@ func TestCreateDepartmentSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer resp.Body.Close()
+
 	var decodedResponse appBase.Response
 	json.NewDecoder(resp.Body).Decode(&decodedResponse)
 
@@ -48,7 +50,7 @@ func TestCreateDepartmentSuccess(t *testing.T) {
 }
 
 // по обновленной логике нельзя создать два департамента с одинаковыми в корне, если parent_id = null
-func TestCreateChildDepartmentSuccess(t *testing.T) {
+func TestCreateChildDepartmentInFirstLevelFail(t *testing.T) {
 	tContainer := base.PrepareTestContainer(t)
 
 	//Первый департамент
@@ -61,6 +63,7 @@ func TestCreateChildDepartmentSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fResp.Body.Close()
 
 	//Второй департамент
 	secondDepartmentRequest := request.CreateDepartmentRequest{
@@ -72,6 +75,7 @@ func TestCreateChildDepartmentSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer sResp.Body.Close()
 
 	assert.Equal(t, http.StatusCreated, fResp.StatusCode)
 	assert.Equal(t, http.StatusConflict, sResp.StatusCode)
@@ -91,6 +95,8 @@ func TestCreateChildDepartmentsSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fResp.Body.Close()
+
 	var fDecodedResponse appBase.Response
 	json.NewDecoder(fResp.Body).Decode(&fDecodedResponse)
 	var rootDepartment model.Department
@@ -107,6 +113,7 @@ func TestCreateChildDepartmentsSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fcResp.Body.Close()
 
 	//Второй дочерний департамент
 	secondChildDepartmentRequest := request.CreateDepartmentRequest{
@@ -119,6 +126,8 @@ func TestCreateChildDepartmentsSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer scResp.Body.Close()
+
 	var scDecodedResponse appBase.Response
 	json.NewDecoder(scResp.Body).Decode(&scDecodedResponse)
 	var scDepartment model.Department
@@ -136,6 +145,7 @@ func TestCreateChildDepartmentsSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fscResp.Body.Close()
 
 	secondSecondChildDepartmentRequest := request.CreateDepartmentRequest{
 		Name:     "Подотдел с уникальным именем",
@@ -147,6 +157,7 @@ func TestCreateChildDepartmentsSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer sscResp.Body.Close()
 
 	assert.Equal(t, http.StatusCreated, fcResp.StatusCode)
 	assert.Equal(t, http.StatusCreated, scResp.StatusCode)
@@ -167,6 +178,8 @@ func TestCreateChildDepartmentWithSameNameFail(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fResp.Body.Close()
+
 	var fDecodedResponse appBase.Response
 	json.NewDecoder(fResp.Body).Decode(&fDecodedResponse)
 	var rootDepartment model.Department
@@ -183,6 +196,7 @@ func TestCreateChildDepartmentWithSameNameFail(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fcResp.Body.Close()
 
 	//Второй дочерний департамент c тем же именем
 	secondChildDepartmentRequest := request.CreateDepartmentRequest{
@@ -195,6 +209,7 @@ func TestCreateChildDepartmentWithSameNameFail(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer scResp.Body.Close()
 
 	assert.Equal(t, http.StatusCreated, fcResp.StatusCode)
 	assert.Equal(t, http.StatusConflict, scResp.StatusCode)
@@ -216,6 +231,8 @@ func TestPlacingDepartmentInsideOwnSubtreeOnFirstLevelFail(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer fResp.Body.Close()
+
 	var fDecodedResponse appBase.Response
 	json.NewDecoder(fResp.Body).Decode(&fDecodedResponse)
 	assert.Equal(t, "parent department not found", fDecodedResponse.ErrorContainer[0].Message)
@@ -234,6 +251,8 @@ func TestDepartmentNameLenFail(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer resp.Body.Close()
+
 	var decodedResponse appBase.Response
 	json.NewDecoder(resp.Body).Decode(&decodedResponse)
 
@@ -254,6 +273,8 @@ func TestDepartmentEmptyNameFail(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer resp.Body.Close()
+
 	var decodedResponse appBase.Response
 	json.NewDecoder(resp.Body).Decode(&decodedResponse)
 
@@ -273,6 +294,8 @@ func TestChangeDepartmentSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer resp.Body.Close()
+
 	var decodedResponse appBase.Response
 	json.NewDecoder(resp.Body).Decode(&decodedResponse)
 
@@ -297,6 +320,8 @@ func TestChangeDepartmentSuccess(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	changeResp, _ := tContainer.HTTPClient.Do(req)
+	defer changeResp.Body.Close()
+
 	var decodedChangeDepResponse appBase.Response
 	json.NewDecoder(changeResp.Body).Decode(&decodedChangeDepResponse)
 
@@ -321,6 +346,8 @@ func TestChangeDepartmentEmptyParentIdSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer resp.Body.Close()
+
 	var decodedResponse appBase.Response
 	json.NewDecoder(resp.Body).Decode(&decodedResponse)
 
@@ -338,6 +365,8 @@ func TestChangeDepartmentEmptyParentIdSuccess(t *testing.T) {
 		"application/json",
 		bytes.NewBuffer(body),
 	)
+	defer resp.Body.Close()
+
 	var secondDepDecodedResponse appBase.Response
 	json.NewDecoder(resp.Body).Decode(&secondDepDecodedResponse)
 
@@ -360,6 +389,8 @@ func TestChangeDepartmentEmptyParentIdSuccess(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 
 	changeResp, _ := tContainer.HTTPClient.Do(req)
+	defer changeResp.Body.Close()
+
 	var decodedChangeDepResponse appBase.Response
 	json.NewDecoder(changeResp.Body).Decode(&decodedChangeDepResponse)
 
@@ -368,4 +399,91 @@ func TestChangeDepartmentEmptyParentIdSuccess(t *testing.T) {
 
 	assert.Equal(t, "Ит отдел изменённый", changedDepartment.Name)
 	assert.Equal(t, createdDepartment.Id, *changedDepartment.ParentId)
+}
+
+func TestChangeChildDepartmentsSuccess(t *testing.T) {
+	tContainer := base.PrepareTestContainer(t)
+
+	//Первый департамент
+	firstDepartmentRequest := request.CreateDepartmentRequest{
+		Name: "ИТ отдел",
+	}
+	body, _ := json.Marshal(firstDepartmentRequest)
+	fResp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	defer fResp.Body.Close()
+
+	var fDecodedResponse appBase.Response
+	json.NewDecoder(fResp.Body).Decode(&fDecodedResponse)
+	var rootDepartment model.Department
+	json.NewDecoder(fDecodedResponse.PayloadContainer).Decode(&rootDepartment)
+
+	//Первый дочерний департамент
+	firstChildDepartmentRequest := request.CreateDepartmentRequest{
+		Name:     "Подотдел 1",
+		ParentId: &rootDepartment.Id,
+	}
+	body, _ = json.Marshal(firstChildDepartmentRequest)
+	fcResp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	defer fcResp.Body.Close()
+
+	var fcDecodedResponse appBase.Response
+	json.NewDecoder(fcResp.Body).Decode(&fcDecodedResponse)
+	var fcDepartment model.Department
+	json.NewDecoder(fcDecodedResponse.PayloadContainer).Decode(&fcDepartment)
+
+	//Второй дочерний департамент
+	secondChildDepartmentRequest := request.CreateDepartmentRequest{
+		Name:     "Подотдел 2",
+		ParentId: &rootDepartment.Id,
+	}
+	body, _ = json.Marshal(secondChildDepartmentRequest)
+	scResp, _ := tContainer.HTTPClient.Post(
+		tContainer.HTTPServer.URL+"/departments",
+		"application/json",
+		bytes.NewBuffer(body),
+	)
+	defer scResp.Body.Close()
+
+	var scDecodedResponse appBase.Response
+	json.NewDecoder(scResp.Body).Decode(&scDecodedResponse)
+	var scDepartment model.Department
+	json.NewDecoder(scDecodedResponse.PayloadContainer).Decode(&scDepartment)
+
+	bodyData := map[string]any{
+		"name":      "Подотдел 2 изменённый",
+		"parent_id": fcDepartment.Id,
+	}
+	body, _ = json.Marshal(bodyData)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	req, _ := http.NewRequestWithContext(
+		ctx,
+		http.MethodPatch,
+		tContainer.HTTPServer.URL+"/departments/"+strconv.Itoa(scDepartment.Id),
+		bytes.NewBuffer(body),
+	)
+
+	changeResp, _ := tContainer.HTTPClient.Do(req)
+
+	defer changeResp.Body.Close()
+
+	var decodedChangeDepResponse appBase.Response
+	json.NewDecoder(changeResp.Body).Decode(&decodedChangeDepResponse)
+
+	var changedDepartment model.Department
+	json.NewDecoder(decodedChangeDepResponse.PayloadContainer).Decode(&changedDepartment)
+
+	assert.Equal(t, changeResp.StatusCode, http.StatusOK)
+	assert.Equal(t, "Подотдел 2 изменённый", changedDepartment.Name)
+	assert.Equal(t, fcDepartment.Id, *changedDepartment.ParentId)
 }
